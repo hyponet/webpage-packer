@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,19 +53,32 @@ func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
 	w.workerQ <- opt.URL
 
 	wg := sync.WaitGroup{}
+	errCh := make(chan error, 1)
 	for i := 0; i < w.parallel; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			w.workerRun(ctx, opt)
+			w.workerRun(ctx, opt, errCh)
 		}()
 	}
 
 	wg.Wait()
-	w.resource.WebMainResource = w.resource.WebSubresources[0]
+	select {
+	case err := <-errCh:
+		return err
+	default:
+		w.resource.WebMainResource = w.resource.WebSubresources[0]
+	}
+
+	if err := runJavaScript(w.resource); err != nil {
+		return fmt.Errorf("run javascript failed: %s", err)
+	}
 
 	if opt.ClutterFree {
-		MakeClutterFree(w.resource)
+		err := MakeClutterFree(w.resource)
+		if err != nil {
+			return fmt.Errorf("make clustter free failed: %s", err)
+		}
 	}
 
 	output, err := os.OpenFile(opt.Output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0655)
@@ -82,7 +96,7 @@ func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
 	return nil
 }
 
-func (w *webArchiver) workerRun(ctx context.Context, opt Option) {
+func (w *webArchiver) workerRun(ctx context.Context, opt Option, errCh chan error) {
 	cli := &http.Client{
 		Transport: http.DefaultTransport,
 		Timeout:   defaultTimeout,
@@ -111,12 +125,16 @@ func (w *webArchiver) workerRun(ctx context.Context, opt Option) {
 			_, seen := w.seen[urlStr]
 			w.mux.Unlock()
 			if !seen {
-				if err := w.loadWebPageFromUrl(ctx, cli, headers, urlStr); err != nil {
-					panic(err)
-				}
 				w.mux.Lock()
 				w.seen[urlStr] = struct{}{}
 				w.mux.Unlock()
+				if err := w.loadWebPageFromUrl(ctx, cli, headers, urlStr); err != nil {
+					select {
+					case errCh <- err:
+					default:
+
+					}
+				}
 			}
 		case <-ctx.Done():
 			return
@@ -172,8 +190,8 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 	w.resource.WebSubresources = append(w.resource.WebSubresources, item)
 	w.mux.Unlock()
 
-	switch contentType {
-	case MIMEHTML:
+	switch {
+	case strings.Contains(contentType, MIMEHTML):
 		query, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("build doc query with url %s error: %s", urlStr, err)
@@ -218,7 +236,7 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 
 		close(w.workerQ)
 
-	case MIMECSS:
+	case strings.Contains(contentType, MIMECSS):
 		// TODO: parse @import url
 	}
 
