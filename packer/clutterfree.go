@@ -31,7 +31,7 @@ iframe { height: auto; width: auto; max-width: 95%; max-height: 100%; }</style>
 </body>
 `
 
-func MakeClutterFree(wa *WebArchive) error {
+func makeClutterFree(wa *WebArchive) error {
 	res := wa.WebMainResource
 	resUrl, err := url.Parse(res.WebResourceURL)
 	if err != nil {
@@ -53,4 +53,27 @@ func MakeClutterFree(wa *WebArchive) error {
 	wa.WebSubresources[0] = res
 
 	return nil
+}
+
+func htmlContentClutterFree(urlStr, htmlContent string) (string, error) {
+	resUrl := &url.URL{}
+
+	if urlStr != "" {
+		var err error
+		resUrl, err = url.Parse(urlStr)
+		if err != nil {
+			return "", fmt.Errorf("parse main resource url failed: %s", err)
+		}
+	}
+
+	article, err := readability.FromReader(bytes.NewReader([]byte(htmlContent)), resUrl)
+	if err != nil {
+		return "", fmt.Errorf("parse main resource failed: %s", err)
+	}
+
+	buf := bytes.Buffer{}
+	buf.WriteString(fmt.Sprintf("<h1>%s</h1>\n", article.Title))
+	buf.WriteString(article.Content)
+
+	return buf.String(), nil
 }

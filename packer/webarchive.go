@@ -6,26 +6,14 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
+	"howett.net/plist"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"time"
-
-	"github.com/PuerkitoBio/goquery"
-	"howett.net/plist"
-)
-
-var (
-	defaultTimeout = time.Minute
-	defaultHeaders = map[string]string{
-		"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-		"User-Agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.15",
-		"Accept-Language": "en-us",
-		"Accept-Encoding": "gzip, deflate",
-	}
 )
 
 type WebArchive struct {
@@ -50,6 +38,13 @@ type webArchiver struct {
 }
 
 func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
+	if opt.URL == "" {
+		return fmt.Errorf("url is empty")
+	}
+	if opt.FilePath == "" {
+		return fmt.Errorf("file path is empty")
+	}
+
 	w.workerQ <- opt.URL
 
 	wg := sync.WaitGroup{}
@@ -70,18 +65,14 @@ func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
 		w.resource.WebMainResource = w.resource.WebSubresources[0]
 	}
 
-	if err := runJavaScript(w.resource); err != nil {
-		return fmt.Errorf("run javascript failed: %s", err)
-	}
-
 	if opt.ClutterFree {
-		err := MakeClutterFree(w.resource)
+		err := makeClutterFree(w.resource)
 		if err != nil {
 			return fmt.Errorf("make clustter free failed: %s", err)
 		}
 	}
 
-	output, err := os.OpenFile(opt.Output, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0655)
+	output, err := os.OpenFile(opt.FilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0655)
 	if err != nil {
 		return fmt.Errorf("open output file failed: %s", err)
 	}
@@ -97,24 +88,7 @@ func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
 }
 
 func (w *webArchiver) workerRun(ctx context.Context, opt Option, errCh chan error) {
-	cli := &http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   defaultTimeout,
-	}
-	if opt.Timeout > 0 {
-		cli.Timeout = time.Second * time.Duration(opt.Timeout)
-	}
-
-	headers := map[string]string{"Referer": opt.URL}
-	for k, v := range defaultHeaders {
-		headers[k] = v
-	}
-	if len(opt.Headers) > 0 {
-		for k, v := range opt.Headers {
-			headers[k] = v
-		}
-	}
-
+	cli, headers := newHttpClient(opt)
 	for {
 		select {
 		case urlStr, ok := <-w.workerQ:
@@ -140,6 +114,43 @@ func (w *webArchiver) workerRun(ctx context.Context, opt Option, errCh chan erro
 			return
 		}
 	}
+}
+
+func (w *webArchiver) ReadContent(ctx context.Context, opt Option) (string, error) {
+	if opt.FilePath != "" {
+		f, err := os.OpenFile(opt.FilePath, os.O_RDONLY, 0655)
+		if err != nil {
+			return "", fmt.Errorf("open %s failed: %s", opt.FilePath, err)
+		}
+		defer f.Close()
+
+		d := plist.NewDecoder(f)
+		err = d.Decode(w.resource)
+		if err != nil {
+			return "", fmt.Errorf("load webarchive %s failed: %s", opt.FilePath, err)
+		}
+	} else {
+		go func() {
+			for _ = range w.workerQ {
+				// discard next url
+			}
+		}()
+
+		cli, headers := newHttpClient(opt)
+		if err := w.loadWebPageFromUrl(ctx, cli, headers, opt.URL); err != nil {
+			return "", err
+		}
+		if len(w.resource.WebSubresources) == 0 {
+			return "", fmt.Errorf("no web subresource found")
+		}
+		w.resource.WebMainResource = w.resource.WebSubresources[0]
+	}
+
+	content := string(w.resource.WebMainResource.WebResourceData)
+	if opt.ClutterFree {
+		return htmlContentClutterFree(opt.URL, content)
+	}
+	return content, nil
 }
 
 func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, headers map[string]string, urlStr string) error {
@@ -192,6 +203,10 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 
 	switch {
 	case strings.Contains(contentType, MIMEHTML):
+		newHtml := xssSanitize(string(data))
+		data = []byte(newHtml)
+		item.WebResourceData = data
+
 		query, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("build doc query with url %s error: %s", urlStr, err)

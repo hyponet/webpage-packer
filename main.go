@@ -11,15 +11,17 @@ import (
 var (
 	op = packer.Option{
 		URL:         "",
-		Output:      "output.webarchive",
+		FilePath:    "output.webarchive",
 		Timeout:     60,
 		ClutterFree: false,
 	}
+	packType = "webarchive"
 )
 
 func init() {
 	flag.StringVar(&op.URL, "url", op.URL, "target url")
-	flag.StringVar(&op.Output, "output", op.Output, "archive file output path")
+	flag.StringVar(&op.FilePath, "output", op.FilePath, "archive file output path")
+	flag.StringVar(&packType, "pack-type", packType, "archive file type: webarchive html")
 	flag.BoolVar(&op.ClutterFree, "clutter-free", op.ClutterFree, "web page noise reduction")
 }
 
@@ -31,17 +33,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	if op.Output == "" {
+	if op.FilePath == "" {
 		fmt.Println("--output is empty")
 		os.Exit(1)
 	}
 
 	fmt.Printf("packing url %s\n", op.URL)
-	p := packer.NewWebArchivePacker()
+
+	var p packer.Packer
+	switch packType {
+	case "webarchive":
+		p = packer.NewWebArchivePacker()
+	case "html":
+		p = packer.NewHtmlPacker()
+	default:
+		fmt.Printf("unknown pack type %s\n", packType)
+		os.Exit(1)
+	}
+
 	err := p.Pack(context.TODO(), op)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("output file: %s\n", op.Output)
+	fmt.Printf("output file: %s\n", op.FilePath)
 }

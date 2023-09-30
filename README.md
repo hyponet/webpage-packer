@@ -1,6 +1,16 @@
 # webpage-packer
 
-Cli/Pkg for web page archiving implemented purely in Go.
+webpage-packer is a golang package that saves webpages as archive files.
+You can use it to pack the content of a target webpage into a file in `.webarchive` format.
+
+## What can it do?
+
+- It can archive webpages to prevent link expiration.
+- It can crawl webpages and perform preprocessing operations on the webpage content.
+
+## TODO
+
+- headless browser support
 
 ## Inspired by
 
