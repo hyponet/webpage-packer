@@ -263,8 +263,8 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 			return err
 		}
 
-		newHtml := xssSanitize(patchedHtml)
-		data = []byte(newHtml)
+		//patchedHtml = xssSanitize(patchedHtml)
+		data = []byte(patchedHtml)
 		item.WebResourceData = data
 		w.resource.WebSubresources[0] = item
 		close(w.workerQ)
