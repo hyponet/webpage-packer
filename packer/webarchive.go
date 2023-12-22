@@ -276,6 +276,8 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 				selection.SetAttr("src", srcVal)
 				nextUrl(w.workerQ, urlStr, srcVal)
 			}
+			// remove srcset for display issues
+			selection.RemoveAttr("srcset")
 		})
 
 		query.Find("script").Each(func(i int, selection *goquery.Selection) {
