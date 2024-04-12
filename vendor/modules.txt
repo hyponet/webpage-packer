@@ -1,3 +1,6 @@
+# code.dny.dev/ssrf v0.2.0
+## explicit; go 1.19
+code.dny.dev/ssrf
 # github.com/PuerkitoBio/goquery v1.8.1
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
@@ -24,6 +27,10 @@ github.com/gorilla/css/scanner
 ## explicit; go 1.19
 github.com/microcosm-cc/bluemonday
 github.com/microcosm-cc/bluemonday/css
+# golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
+## explicit; go 1.18
+golang.org/x/exp/constraints
+golang.org/x/exp/slices
 # golang.org/x/net v0.18.0
 ## explicit; go 1.18
 golang.org/x/net/html
