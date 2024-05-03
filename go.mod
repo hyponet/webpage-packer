@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/go-shiori/go-readability v0.0.0-20230421032831-c66949dfc0ad
 	github.com/microcosm-cc/bluemonday v1.0.25
-	golang.org/x/net v0.18.0
+	golang.org/x/net v0.24.0
 	howett.net/plist v1.0.0
 )
 
