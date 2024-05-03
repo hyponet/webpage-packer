@@ -33,31 +33,19 @@ iframe { height: auto; width: auto; max-width: 95%; max-height: 100%; }</style>
 
 func makeClutterFree(wa *WebArchive) error {
 	res := wa.WebMainResource
-	resUrl, err := url.Parse(res.WebResourceURL)
+
+	content, err := htmlContentClutterFree(res.WebResourceURL, string(res.WebResourceData))
 	if err != nil {
-		return fmt.Errorf("parse main resource url failed: %s", err)
+		return err
 	}
-
-	article, err := readability.FromReader(bytes.NewReader(res.WebResourceData), resUrl)
-	if err != nil {
-		return fmt.Errorf("parse main resource failed: %s", err)
-	}
-
-	patched := strings.ReplaceAll(readableHtmlTpl, "{TITLE}", article.Title)
-	patched = strings.ReplaceAll(patched, "{HOST}", resUrl.Host)
-	patched = strings.ReplaceAll(patched, "{URL}", resUrl.String())
-	patched = strings.ReplaceAll(patched, "{CONTENT}", article.Content)
-
-	res.WebResourceData = []byte(patched)
+	res.WebResourceData = []byte(content)
 	wa.WebMainResource = res
 	wa.WebSubresources[0] = res
-
 	return nil
 }
 
 func htmlContentClutterFree(urlStr, htmlContent string) (string, error) {
 	resUrl := &url.URL{}
-
 	if urlStr != "" {
 		var err error
 		resUrl, err = url.Parse(urlStr)
@@ -68,12 +56,13 @@ func htmlContentClutterFree(urlStr, htmlContent string) (string, error) {
 
 	article, err := readability.FromReader(bytes.NewReader([]byte(htmlContent)), resUrl)
 	if err != nil {
-		return "", fmt.Errorf("parse main resource failed: %s", err)
+		return "", fmt.Errorf("parse html resource failed: %s", err)
 	}
 
-	buf := bytes.Buffer{}
-	buf.WriteString(fmt.Sprintf("<h1>%s</h1>\n", article.Title))
-	buf.WriteString(article.Content)
+	patched := strings.ReplaceAll(readableHtmlTpl, "{TITLE}", article.Title)
+	patched = strings.ReplaceAll(patched, "{HOST}", resUrl.Host)
+	patched = strings.ReplaceAll(patched, "{URL}", resUrl.String())
+	patched = strings.ReplaceAll(patched, "{CONTENT}", article.Content)
 
-	return buf.String(), nil
+	return patched, nil
 }

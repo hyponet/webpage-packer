@@ -262,14 +262,6 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 		w.hasMainRes = true
 		w.mux.Unlock()
 
-		if opt.ClutterFree {
-			clutterFreeData, err := htmlContentClutterFree(urlStr, string(data))
-			if err != nil {
-				return fmt.Errorf("pre clutter free error: %s", err)
-			}
-			data = []byte(clutterFreeData)
-		}
-
 		query, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("build doc query with url %s error: %s", urlStr, err)
