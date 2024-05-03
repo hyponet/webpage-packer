@@ -3,6 +3,7 @@ package packer
 import (
 	"bytes"
 	"fmt"
+	"github.com/yosssi/gohtml"
 	"net/url"
 	"strings"
 
@@ -31,19 +32,6 @@ iframe { height: auto; width: auto; max-width: 95%; max-height: 100%; }</style>
 </body>
 `
 
-func makeClutterFree(wa *WebArchive) error {
-	res := wa.WebMainResource
-
-	content, err := htmlContentClutterFree(res.WebResourceURL, string(res.WebResourceData))
-	if err != nil {
-		return err
-	}
-	res.WebResourceData = []byte(content)
-	wa.WebMainResource = res
-	wa.WebSubresources[0] = res
-	return nil
-}
-
 func htmlContentClutterFree(urlStr, htmlContent string) (string, error) {
 	resUrl := &url.URL{}
 	if urlStr != "" {
@@ -64,5 +52,5 @@ func htmlContentClutterFree(urlStr, htmlContent string) (string, error) {
 	patched = strings.ReplaceAll(patched, "{URL}", resUrl.String())
 	patched = strings.ReplaceAll(patched, "{CONTENT}", article.Content)
 
-	return patched, nil
+	return gohtml.Format(patched), nil
 }

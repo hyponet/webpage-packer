@@ -85,13 +85,6 @@ func (w *webArchiver) Pack(ctx context.Context, opt Option) error {
 		w.resource.WebMainResource = w.resource.WebSubresources[0]
 	}
 
-	if opt.ClutterFree {
-		err := makeClutterFree(w.resource)
-		if err != nil {
-			return fmt.Errorf("make clustter free failed: %s", err)
-		}
-	}
-
 	output, err := os.OpenFile(opt.FilePath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0655)
 	if err != nil {
 		return fmt.Errorf("open output file failed: %s", err)
@@ -311,6 +304,13 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 		patchedHtml, err := query.Html()
 		if err != nil {
 			return err
+		}
+
+		if opt.ClutterFree {
+			patchedHtml, err = htmlContentClutterFree(urlStr, patchedHtml)
+			if err != nil {
+				return fmt.Errorf("make clustter free failed: %s", err)
+			}
 		}
 
 		//patchedHtml = xssSanitize(patchedHtml)
