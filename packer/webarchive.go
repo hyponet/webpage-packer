@@ -279,6 +279,11 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 				selection.SetAttr("src", srcVal)
 				nextUrl(w.workerQ, urlStr, srcVal)
 			}
+			srcVal, isExisted = selection.Attr("data-original")
+			if isExisted {
+				selection.SetAttr("src", srcVal)
+				nextUrl(w.workerQ, urlStr, srcVal)
+			}
 			// remove srcset for display issues
 			selection.RemoveAttr("srcset")
 		})
