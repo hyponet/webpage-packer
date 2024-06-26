@@ -255,6 +255,14 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 		w.hasMainRes = true
 		w.mux.Unlock()
 
+		if opt.ClutterFree {
+			clutterFreeContent, err := htmlContentClutterFree(urlStr, string(data))
+			if err != nil {
+				return fmt.Errorf("make clustter free failed: %s", err)
+			}
+			data = []byte(clutterFreeContent)
+		}
+
 		query, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
 		if err != nil {
 			return fmt.Errorf("build doc query with url %s error: %s", urlStr, err)
@@ -309,13 +317,6 @@ func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli *http.Client, 
 		patchedHtml, err := query.Html()
 		if err != nil {
 			return err
-		}
-
-		if opt.ClutterFree {
-			patchedHtml, err = htmlContentClutterFree(urlStr, patchedHtml)
-			if err != nil {
-				return fmt.Errorf("make clustter free failed: %s", err)
-			}
 		}
 
 		//patchedHtml = xssSanitize(patchedHtml)
