@@ -38,6 +38,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	op.EnablePrivateNet = true
 	fmt.Printf("packing url %s\n", op.URL)
 
 	var p packer.Packer
