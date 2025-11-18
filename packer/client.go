@@ -24,7 +24,8 @@ type WebResource struct {
 }
 
 type Client interface {
-	Read(ctx context.Context, url string) (*WebResource, error)
+	ReadMain(ctx context.Context, url string) (*WebResource, error)
+	ReadResource(ctx context.Context, url string) (*WebResource, error)
 }
 
 type httpClient struct {
@@ -32,7 +33,15 @@ type httpClient struct {
 	headers map[string]string
 }
 
-func (h *httpClient) Read(ctx context.Context, urlStr string) (*WebResource, error) {
+func (h *httpClient) ReadMain(ctx context.Context, urlStr string) (*WebResource, error) {
+	return h.httpCall(ctx, urlStr)
+}
+
+func (h *httpClient) ReadResource(ctx context.Context, urlStr string) (*WebResource, error) {
+	return h.httpCall(ctx, urlStr)
+}
+
+func (h *httpClient) httpCall(ctx context.Context, urlStr string) (*WebResource, error) {
 	req, err := http.NewRequest(http.MethodGet, urlStr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request with url %s error: %s", urlStr, err)
@@ -44,11 +53,9 @@ func (h *httpClient) Read(ctx context.Context, urlStr string) (*WebResource, err
 	return doHttpCallWithRetry(ctx, h.cli, urlStr, req)
 }
 
-const (
-	RejectPattern = `^.*\.(?!(html|css|js|json|xml|webmanifest|txt|md)(\?|#|$))[\\w\\-]+(?:[\\?#].*)?$`
-)
-
 type browserlessClient struct {
+	*httpClient
+
 	endpoint    string
 	token       string
 	stealthMode bool
@@ -57,17 +64,19 @@ type browserlessClient struct {
 	headers     map[string]string
 }
 
-func (b *browserlessClient) Read(ctx context.Context, urlStr string) (*WebResource, error) {
+func (b *browserlessClient) ReadMain(ctx context.Context, urlStr string) (*WebResource, error) {
 	apiUrl, err := url.Parse(b.endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("parse browerless endpoint error: %w", err)
 	}
-	apiUrl.Path = "/content"
 
 	v := &url.Values{}
 	v.Set("blockAds", fmt.Sprintf("%v", b.blockAds))
 	v.Set("launch", fmt.Sprintf(`{"stealth": %v}`, b.stealthMode))
-	v.Set("token", b.token)
+	if b.token != "" {
+		v.Set("token", b.token)
+	}
+	apiUrl.Path = "/content"
 	apiUrl.RawQuery = v.Encode()
 
 	data := map[string]any{
@@ -75,8 +84,8 @@ func (b *browserlessClient) Read(ctx context.Context, urlStr string) (*WebResour
 			"timeout":   60000,
 			"waitUntil": "networkidle2",
 		},
-		"rejectRequestPattern": []string{RejectPattern},
-		"url":                  urlStr,
+		"url":                 urlStr,
+		"setExtraHTTPHeaders": b.headers,
 	}
 	raw, err := json.Marshal(data)
 	if err != nil {
@@ -108,8 +117,14 @@ func newClient(opt Option) Client {
 		}
 	}
 
+	hc := &httpClient{
+		cli:     initHttpCli(!opt.EnablePrivateNet, time.Second*time.Duration(opt.Timeout)),
+		headers: headers,
+	}
+
 	if opt.Browserless != nil {
 		return &browserlessClient{
+			httpClient:  hc,
 			endpoint:    opt.Browserless.Endpoint,
 			token:       opt.Browserless.Token,
 			stealthMode: opt.Browserless.StealthMode,
@@ -119,10 +134,7 @@ func newClient(opt Option) Client {
 		}
 	}
 
-	return &httpClient{
-		cli:     initHttpCli(!opt.EnablePrivateNet, time.Second*time.Duration(opt.Timeout)),
-		headers: headers,
-	}
+	return hc
 }
 
 func initHttpCli(enableSSRF bool, timeout time.Duration) *http.Client {
@@ -179,7 +191,15 @@ func doHttpCallWithRetry(ctx context.Context, cli *http.Client, urlStr string, r
 	}()
 
 	if resp.StatusCode/100 != 2 {
-		return nil, fmt.Errorf("do request with url %s error: status code is %d", urlStr, resp.StatusCode)
+		raw, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("do request with url %s error: status code is %d %s", urlStr, resp.StatusCode, string(raw))
+	}
+
+	// for browserless
+	if realCode := resp.Header.Get("X-Response-Code"); realCode != "" {
+		if !strings.HasPrefix(realCode, "2") {
+			return nil, fmt.Errorf("do request with url %s error: status code is %d", urlStr, resp.StatusCode)
+		}
 	}
 
 	var bodyReader io.Reader

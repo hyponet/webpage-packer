@@ -162,7 +162,15 @@ func (w *webArchiver) ReadContent(ctx context.Context, opt Option) (string, erro
 }
 
 func (w *webArchiver) loadWebPageFromUrl(ctx context.Context, cli Client, urlStr string, opt Option) error {
-	res, err := cli.Read(ctx, urlStr)
+	var (
+		res *WebResource
+		err error
+	)
+	if !w.hasMainRes {
+		res, err = cli.ReadMain(ctx, urlStr)
+	} else {
+		res, err = cli.ReadResource(ctx, urlStr)
+	}
 	if err != nil {
 		return err
 	}

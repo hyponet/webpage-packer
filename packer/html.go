@@ -84,7 +84,7 @@ func (h *htmlPacker) readContentByUrl(ctx context.Context, opt Option) (string, 
 		return "", fmt.Errorf("url is empty")
 	}
 	cli := newClient(opt)
-	res, err := cli.Read(ctx, opt.URL)
+	res, err := cli.ReadMain(ctx, opt.URL)
 	if err != nil {
 		return "", fmt.Errorf("read response body with url %s error: %s", opt.URL, err)
 	}

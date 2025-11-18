@@ -16,7 +16,9 @@ var (
 		Timeout:     60,
 		ClutterFree: false,
 	}
-	packType = "webarchive"
+	packType            = "webarchive"
+	browserlessEndpoint = os.Getenv("BROWSERLESS_ENDPOINT")
+	browserlessToken    = os.Getenv("BROWSERLESS_TOKEN")
 )
 
 func init() {
@@ -51,6 +53,15 @@ func main() {
 	default:
 		fmt.Printf("unknown pack type %s\n", packType)
 		os.Exit(1)
+	}
+
+	if browserlessEndpoint != "" {
+		op.Browserless = &packer.Browserless{
+			Endpoint:    browserlessEndpoint,
+			Token:       browserlessToken,
+			StealthMode: true,
+			BlockADS:    true,
+		}
 	}
 
 	err := p.Pack(context.TODO(), op)
