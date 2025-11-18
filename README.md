@@ -8,10 +8,6 @@ You can use it to pack the content of a target webpage into a file in `.webarchi
 - It can archive webpages to prevent link expiration.
 - It can crawl webpages and perform preprocessing operations on the webpage content.
 
-## TODO
-
-- headless browser support
-
 ## Inspired by
 
 - [python-webarchive](https://github.com/rcarmo/python-webarchive)

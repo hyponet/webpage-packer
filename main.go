@@ -4,8 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/hyponet/webpage-packer/packer"
 	"os"
+
+	"github.com/hyponet/webpage-packer/packer"
 )
 
 var (
